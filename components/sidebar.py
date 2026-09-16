@@ -6,7 +6,26 @@ HAPPINESS_TYPE_ORDER = ["自己実現派", "自己成長派", "自然体派", "�
 
 
 def render_sidebar(df):
-    st.sidebar.markdown('<div class="filter-panel"><div class="sidebar-title">U.Ge Dashboard</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="sidebar-toc__heading">分析項目</div>', unsafe_allow_html=True)
+    with st.sidebar.expander("ウェルビーイング分析", expanded=False):
+        st.markdown('[01 年代別](#age)')
+        st.markdown('[02 ペンタゴン別](#pentagon)')
+        st.markdown('[03 現在のしあわせ状況](#current-happiness)')
+        st.markdown('[04 理想のしあわせ状況](#ideal-happiness)')
+    with st.sidebar.expander("感性分析", expanded=True):
+        st.markdown('[05 好きな色](#color)')
+        st.markdown('[06 「しあわせ」を感じるピンク](#pink)')
+        st.markdown('[07 好きなファッションスタイル](#fashion)')
+        st.markdown('[08 好きなインテリアスタイル](#interior)')
+        st.markdown('[09 高級感のあるインテリアイメージ](#luxury-interior)')
+        st.markdown('[10 理想の暮らし方](#lifestyle)')
+        st.markdown('[11 プレミアム商品を買う目的](#premium-purpose)')
+        st.markdown('[12 最も高級だと感じる体験](#luxury-experience)')
+        st.markdown('[13 Up-Gradeのために奮発したジャンル](#upgrade)')
+        st.markdown('[14 今後やりたいこと](#future)')
+    with st.sidebar.expander("自由記述・詳細"):
+        st.markdown('[15 年度別の自由記述](#comments)')
+        st.markdown('[16 フィルタ結果の詳細](#filtered-details)')
 
     current_happiness_column = next((column for column in ("現在の幸福状態", "現在の幸福状況（集約分）") if column in df.columns), None)
     ideal_happiness_column = next((column for column in ("理想的な幸福状態", "理想的な幸福の状態（集約分）", "幸せに必要なこと") if column in df.columns), None)
@@ -138,8 +157,6 @@ def render_sidebar(df):
             [happiness_all_option, *income_options],
             key=f"sidebar_income_{dataset_signature}",
         )
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     mask = pd.Series(True, index=df.index)
     if "年度" in df.columns and selected_year != "すべて":

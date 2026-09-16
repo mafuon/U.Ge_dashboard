@@ -6,14 +6,18 @@ import streamlit as st
 
 from components.sidebar import render_sidebar
 from components.cards import render_metric_cards
-from components.charts import render_charts, render_comment_section, render_filtered_details, render_pink_analysis, render_trend
+from components.charts import render_charts, render_comment_section, render_filtered_details, render_happiness_structure_relation, render_trend
 from components.sensory import DEFAULTS, render_sensory_analysis
-from components.wellbeing import render_wellbeing_analysis
+from components.wellbeing import render_pentagon_structure_relation, render_wellbeing_analysis, render_wellbeing_intro
 
-
-st.set_page_config(page_title="U.Ge アンケート分析ダッシュボード", page_icon="📊", layout="wide")
 
 base_dir = Path(__file__).resolve().parent
+st.set_page_config(
+    page_title="U.Ge アンケート分析ダッシュボード",
+    page_icon=str(base_dir / "assets" / "u_ge_logo.svg"),
+    layout="wide",
+)
+
 css_path = base_dir / "assets" / "style.css"
 with open(css_path, encoding="utf-8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -261,11 +265,13 @@ def load_data(uploaded_file=None):
 def render_section_navigation():
     st.markdown(
         '''<nav class="section-navigation" aria-label="セクション移動">
-            <a class="section-navigation__item section-navigation__item--wellbeing" href="#wellbeing">ウェルビーイング分析<span>01-02</span></a>
-            <a class="section-navigation__item section-navigation__item--sensory" href="#sensory">感性分析 | すきな色・暮らし・行動<span>03-11</span></a>
-            <a class="section-navigation__item section-navigation__item--happiness" href="#happiness">しあわせ指数<span>12</span></a>
-            <a class="section-navigation__item section-navigation__item--pink" href="#pink">しあわせピンク<span>13</span></a>
-            <a class="section-navigation__item section-navigation__item--comments" href="#comments">自由記述<span>回答を見る</span></a>
+            <a class="section-navigation__item section-navigation__item--wellbeing" href="#wellbeing">ウェルビーイング分析</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#sensory">感性分析</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#color">カラー</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#fashion">ファッション</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#interior">インテリア</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#lifestyle">ライフスタイル</a>
+            <a class="section-navigation__item section-navigation__item--sensory" href="#premium-purpose">Up-Grade意識</a>
         </nav>''',
         unsafe_allow_html=True,
     )
@@ -273,6 +279,7 @@ def render_section_navigation():
 
 def main():
     uploaded_file = st.sidebar.file_uploader("CSVファイルをアップロード", type=["csv"], help="UTF-8、UTF-8 BOM、Shift-JIS、CP932に対応", key="csv_uploader")
+    st.markdown('<div id="top" class="page-top-anchor"></div>', unsafe_allow_html=True)
     st.markdown('<div class="dashboard-title">アンケート分析ダッシュボード</div>', unsafe_allow_html=True)
     if uploaded_file is None:
         st.info("サイドバーからCSVファイルをアップロードすると、分析結果を表示します。")
@@ -285,17 +292,19 @@ def main():
         st.info("別のCSVファイルをアップロードしてください。")
         return
 
-    source_label = f"CSV: {uploaded_file.name}"
-    st.markdown(f'<div class="dashboard-sub">{source_label}を読み込み、直感的に比較・分析できます。</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dashboard-sub">CSVを読み込み、直感的に比較・分析できます。</div>', unsafe_allow_html=True)
     render_section_navigation()
+    st.markdown('<a class="back-to-top" href="#top" aria-label="ページの先頭に戻る">↑ TOP</a>', unsafe_allow_html=True)
 
     filtered_df, _ = render_sidebar(df)
     render_metric_cards(filtered_df)
-    render_wellbeing_analysis(filtered_df)
-    render_sensory_analysis(filtered_df)
+    render_wellbeing_intro()
+    render_happiness_structure_relation()
+    render_pentagon_structure_relation()
     render_charts(filtered_df)
     render_trend(filtered_df)
-    render_pink_analysis(filtered_df)
+    render_wellbeing_analysis(filtered_df)
+    render_sensory_analysis(filtered_df)
     render_comment_section(filtered_df)
     render_filtered_details(filtered_df)
 

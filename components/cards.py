@@ -3,6 +3,8 @@ import math
 import pandas as pd
 import streamlit as st
 
+from components.chart_data import show_chart_data
+
 try:
     import altair as alt
 except Exception:
@@ -115,8 +117,14 @@ def render_metric_cards(df):
     avg_score = pd.to_numeric(score_series, errors="coerce").mean()
     avg_score = 0 if pd.isna(avg_score) else avg_score
     happiness_out_of_six = round((avg_score / 100) * 6, 1)
+    ideal_score_series = next(
+        (df[column] for column in ("理想的な幸福状態", "理想の幸福状態") if column in df.columns),
+        pd.Series(dtype=float),
+    )
+    ideal_score = pd.to_numeric(ideal_score_series, errors="coerce").mean()
+    ideal_happiness_out_of_six = "--" if pd.isna(ideal_score) else round(ideal_score, 1)
 
-    columns = st.columns([1, 1, 2] if SHOW_CURRENT_HAPPINESS_COMPOSITION else [1, 1])
+    columns = st.columns([1, 1, 1, 2] if SHOW_CURRENT_HAPPINESS_COMPOSITION else [1, 1, 1])
     col1, col2 = columns[:2]
 
     with col1:
@@ -143,9 +151,21 @@ def render_metric_cards(df):
             unsafe_allow_html=True,
         )
 
+    with columns[2]:
+        st.markdown(
+            f"""
+            <div class="metric-panel">
+                <div class="metric-label">理想の幸福度スコア（平均）</div>
+                <div class="metric-value">{ideal_happiness_out_of_six}</div>
+                <div class="metric-unit">/ 6</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     if SHOW_CURRENT_HAPPINESS_COMPOSITION:
-        col3 = columns[2]
-        with col3:
+        col4 = columns[3]
+        with col4:
             type_radar = _happiness_type_radar(df)
             default_values = [4.2, 4.4, 4.0, 4.6, 4.8]
             if type_radar is not None:
@@ -179,5 +199,6 @@ def render_metric_cards(df):
 
                 if alt is not None:
                     st.altair_chart(_radar_chart(radar_df, max_score, color, score_suffix), width="content")
+                    show_chart_data(radar_df, "current-happiness-radar")
                 else:
                     st.write(radar_df.set_index("項目"))

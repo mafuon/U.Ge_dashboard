@@ -29,7 +29,7 @@ PINK_CHOICE_NAMES = {
 
 def render_filtered_details(df):
     st.markdown('<div class="content-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-header section-orange">フィルタ結果の詳細</div>', unsafe_allow_html=True)
+    st.markdown('<div id="filtered-details" class="section-anchor"></div><div class="section-number">16</div><div class="section-header section-orange">フィルタ結果の詳細</div>', unsafe_allow_html=True)
 
     detail_columns = [
         "年度", "年齢", "性別", "居住地", "現在の幸福度タイプ", "理想の幸福度タイプ",
@@ -41,11 +41,22 @@ def render_filtered_details(df):
         return
 
     st.caption(f"抽出対象：{len(df):,}人")
-    st.dataframe(df[visible_columns], hide_index=True, width="stretch", height=420)
+    table_html = df[visible_columns].to_html(
+        index=False,
+        escape=True,
+        classes="filtered-details-table",
+        border=0,
+    )
+    st.markdown(
+        f'<div class="filtered-details-table-wrap">{table_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _happiness_section_title():
-    st.markdown('<div class="sensory-kicker">12</div><h3 class="sensory-title">しあわせ指数</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="sensory-kicker">01</div>', unsafe_allow_html=True)
+    st.subheader("年代別")
+    st.caption("幸福度比較")
 
 
 def _pink_choice_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,15 +72,17 @@ def _pink_choice_data(df: pd.DataFrame) -> pd.DataFrame:
     values = values.dropna(subset=["色票番号"])
     values["色票番号"] = values["色票番号"].astype(int)
     values["色票"] = values["色票番号"].map(lambda number: f"{number} {PINK_CHOICE_NAMES.get(number, 'その他')}")
-    data = values.groupby(["年度", "色票"], as_index=False).size().rename(columns={"size": "回答数"})
+    data = values.groupby(["年度", "色票番号", "色票"], as_index=False).size().rename(columns={"size": "回答数"})
     respondent_counts = values.groupby("年度").size()
     data["回答率"] = data["回答数"].div(data["年度"].map(respondent_counts)).mul(100)
     data["構成比"] = data.groupby("年度")["回答数"].transform(lambda counts: counts.div(counts.sum()).mul(100))
+    data = data.sort_values("色票番号").reset_index(drop=True)
+    data.index = range(1, len(data) + 1)
     return data
 
 
 def _pink_choice_color_map(data: pd.DataFrame) -> dict[str, str]:
-    choices = data["色票"].drop_duplicates().tolist()
+    choices = data.sort_values("色票番号")["色票"].drop_duplicates().tolist()
     return {
         choice: PINK_CHOICE_COLORS.get(int(choice.split(" ", 1)[0]), "#D7DCE2")
         for choice in choices
@@ -101,9 +114,11 @@ def render_pink_analysis(df: pd.DataFrame):
         return
 
     st.markdown('<div id="pink" class="section-anchor"></div><div class="sensory-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="sensory-kicker">13</div><h3 class="sensory-title">「しあわせ」を感じるピンク</h3><div class="sensory-note">これらピンクの中に「しあわせ」を感じるとしたら、あなたの気持ちに近い色はどれですか？</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sensory-kicker">06</div><h3 class="sensory-title">「しあわせ」を感じるピンク</h3><div class="sensory-note">これらピンクの中に「しあわせ」を感じるとしたら、あなたの気持ちに近い色はどれですか？</div>', unsafe_allow_html=True)
     color_map = _pink_choice_color_map(data)
-    overall = data.groupby("色票", as_index=False)["回答数"].sum()
+    overall = data.groupby(["色票番号", "色票"], as_index=False)["回答数"].sum().sort_values(
+        ["回答数", "色票番号"], ascending=[False, True]
+    )
     overall["回答率"] = overall["回答数"].div(overall["回答数"].sum()).mul(100)
 
     if alt is not None:
@@ -111,7 +126,7 @@ def render_pink_analysis(df: pd.DataFrame):
             x=alt.X("回答率:Q", title="回答者比率（%）", axis=alt.Axis(format=".0f")),
             y=alt.Y(
                 "色票:N",
-                sort="-x",
+                sort=overall["色票"].tolist(),
                 title=None,
                 axis=alt.Axis(labelLimit=420, labelFontSize=13),
             ),
@@ -132,11 +147,12 @@ def render_pink_analysis(df: pd.DataFrame):
         if not demographic.empty:
             target_years = ["2024年度", "2025年度"]
             demographic["属性"] = demographic["性別"].astype(str) + " " + demographic["年齢"].astype(str)
+            available_attributes = set(demographic["属性"])
             demographic_order = [
                 f"{gender} {age}"
-                for age in AGE_ORDER
                 for gender in ("女性", "男性")
-                if f"{gender} {age}" in set(demographic["属性"])
+                for age in AGE_ORDER
+                if f"{gender} {age}" in available_attributes
             ]
             demographic["構成比"] = demographic.groupby(["年度", "属性"])["回答数"].transform(
                 lambda counts: counts.div(counts.sum())
@@ -181,7 +197,7 @@ def render_charts(df):
     if df.empty:
         return
 
-    st.markdown('<div id="happiness" class="section-anchor"></div><div class="content-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div id="age" class="section-anchor"></div>', unsafe_allow_html=True)
     _happiness_section_title()
     score_col = "幸福度平均" if "幸福度平均" in df.columns else "幸福度スコア" if "幸福度スコア" in df.columns else None
 
@@ -195,7 +211,6 @@ def render_charts(df):
         values = pd.DataFrame({"属性": group_series, output_column: pd.to_numeric(value_series, errors="coerce")})
         return values.groupby("属性", dropna=False)[output_column].mean().reset_index()
 
-    st.markdown('<div class="sensory-note">幸福度比較</div>', unsafe_allow_html=True)
     if score_col is None or "年齢" not in df.columns:
         st.info("幸福度または年代の列がないため、比較を表示できません。")
         return
@@ -218,8 +233,23 @@ def render_charts(df):
             x=alt.X("年齢:N", sort=AGE_ORDER),
             y=alt.Y("幸福度平均:Q", scale=alt.Scale(domain=[0, 100])),
         )
-        chart = (bars + trend).properties(height=420, padding=CHART_PADDING)
-        st.altair_chart(chart, use_container_width=True)
+        overall_mean = compare_df["幸福度平均"].mean()
+        average_line = alt.Chart(pd.DataFrame({"全体平均": [overall_mean]})).mark_rule(
+            color="#E26A6A",
+            strokeDash=[6, 4],
+            strokeWidth=2,
+        ).encode(
+            y=alt.Y("全体平均:Q", scale=alt.Scale(domain=[0, 100])),
+            tooltip=[alt.Tooltip("全体平均:Q", title="現在の幸福度スコア（全体平均）", format=".1f")],
+        )
+        chart = (
+            (bars + trend + average_line)
+            .properties(height=420, padding={"left": 60, "right": 60, "top": 60, "bottom": 60})
+            .configure(background="#FFFFFF")
+            .configure_legend(labelFontSize=13, titleFontSize=14)
+        )
+        st.markdown('<div class="average-line-note"><span></span>赤い点線：全体平均値</div>', unsafe_allow_html=True)
+        st.altair_chart(chart, width="stretch")
     else:
         st.bar_chart(compare_df.set_index("年齢")[["幸福度平均"]], use_container_width=True)
 
@@ -260,7 +290,7 @@ def _display_free_text(value):
 
 def render_comment_section(df):
     st.markdown('<div class="content-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div id="comments" class="section-anchor"></div><div class="section-number">14</div><div class="section-header section-orange">年度別の自由記述</div>', unsafe_allow_html=True)
+    st.markdown('<div id="comments" class="section-anchor"></div><div class="section-number">15</div><div class="section-header section-orange">年度別の自由記述</div>', unsafe_allow_html=True)
     question_columns = _free_text_columns(df)
     if not question_columns or "年度" not in df.columns:
         st.info("年度別に表示できる自由記述の設問がありません。")
@@ -293,23 +323,16 @@ def render_comment_section(df):
     answer_column = available_questions[selected_question]
     question_text = str(answer_column).replace("\\n", " ").replace("\n", " ").strip()
     st.caption(f"設問: {question_text}")
-    query = st.text_input(
-        "自由記述を検索",
-        placeholder="キーワードを入力して押してください",
-        key="free_text_query",
-    )
     comment_df = year_df[_has_free_text(year_df[answer_column])].copy()
     comment_df[answer_column] = comment_df[answer_column].astype(str).str.strip()
     comment_df = comment_df[comment_df[answer_column].ne("")]
-    if query:
-        comment_df = comment_df[comment_df[answer_column].str.contains(query, case=False, na=False)]
 
     st.caption(f"{selected_year}年度 / {selected_question} / 回答 {len(comment_df):,}件")
     if comment_df.empty:
         st.info("該当する自由記述がありません。")
         return
 
-    display_context = (selected_year, selected_question, query)
+    display_context = (selected_year, selected_question)
     if st.session_state.get("free_text_display_context") != display_context:
         st.session_state["free_text_display_context"] = display_context
         st.session_state["free_text_display_limit"] = 8
@@ -368,16 +391,51 @@ def render_trend(df):
     trend_df["年度"] = trend_df["年度"].astype(str)
     trend_df["年齢"] = trend_df["年齢"].astype(str)
     trend_df = trend_df[trend_df["年齢"].isin(AGE_ORDER)]
-    st.markdown('<div class="sensory-note">年代別の幸福度推移</div>', unsafe_allow_html=True)
+    st.markdown('<div class="happiness-chart-title">年代別幸福度推移</div>', unsafe_allow_html=True)
+    trend_df["年度"] = trend_df["年度"].astype(str).str.extract(r"(20\d{2})", expand=False)
+    trend_df = trend_df.dropna(subset=["年度"])
+    trend_df = trend_df[trend_df["年度"].isin([str(year) for year in range(2022, 2027)])]
+    trend_df["年度"] = pd.Categorical(
+        trend_df["年度"],
+        categories=[str(year) for year in range(2022, 2027)],
+        ordered=True,
+    )
+    if trend_df.empty:
+        return
     if alt is not None:
         chart = alt.Chart(trend_df).mark_line(point=True).encode(
-            x=alt.X("年度:N", title="年度", sort=None),
+            x=alt.X("年度:N", title="年度", sort=[str(year) for year in range(2022, 2027)]),
             y=alt.Y("幸福度平均:Q", title="幸福度平均", scale=alt.Scale(domain=[0, 100])),
             color=alt.Color("年齢:N", title="年代", sort=AGE_ORDER),
             detail="年齢:N",
             tooltip=[alt.Tooltip("年度:N", title="年度"), alt.Tooltip("年齢:N", title="年代"), alt.Tooltip("幸福度平均:Q", title="幸福度平均", format=".1f")],
-        ).properties(height=340, padding=CHART_PADDING)
-        st.altair_chart(chart, use_container_width=True)
+        ).properties(height=340, padding={"left": 60, "right": 60, "top": 60, "bottom": 60}).configure(
+            background="#FFFFFF"
+        ).configure_legend(labelFontSize=13, titleFontSize=14)
+        st.altair_chart(chart, width="stretch")
     else:
         fallback_df = trend_df.pivot(index="年度", columns="年齢", values="幸福度平均").reindex(columns=AGE_ORDER)
-        st.line_chart(fallback_df, use_container_width=True)
+        st.line_chart(fallback_df, width="stretch")
+
+
+def render_happiness_structure_relation():
+    with st.expander("幸福度スコアと年代別グラフの関係性"):
+        st.markdown(
+            """
+            <div style="background-color:#f2f2f2; padding:15px; border-radius:8px; font-size:0.72rem;">
+            このダッシュボードでは、幸福度を「スコアカード」「上段グラフ」「下段グラフ」の3つの視点から表示しています。<br>
+            それぞれの指標は異なる集計単位と目的を持っています。<br><br>
+
+            <strong>スコアカード（現在／理想の幸福度スコア（平均））</strong><br>
+            全回答者の平均値を単一の数値として算出し、幸福度そのものの“高さ”を示す絶対的な指標です。<br><br>
+
+            <strong>上段グラフ（年代別）</strong><br>
+            年代別の平均値をもとに、幸福度の高さを年代ごとに比較するための指標です。<br>
+            同じスケール上で「どの年代がより幸福度が高いか」を視覚的に把握できます。<br><br>
+
+            <strong>下段グラフ（年代別幸福度推移）</strong><br>
+            年度×年代の構成比をもとに、各年代が全体幸福度に占める割合の変化を示します。
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
