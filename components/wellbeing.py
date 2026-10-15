@@ -67,6 +67,43 @@ CURRENT_CATEGORY_MAP = {
 }
 
 
+def current_pentagon_scores(df: pd.DataFrame) -> pd.DataFrame:
+    axis_groups = {
+        "Q1_自己実現派": ["自己実現"],
+        "Q2_自己成長派": ["自己成長"],
+        "Q3_社会交流派": ["自己発信", "社会交流"],
+        "Q4_生活充実派": ["生活充実"],
+        "Q5_自然体派": ["自然体"],
+    }
+    scores = pd.DataFrame(index=df.index)
+    for target, tokens in axis_groups.items():
+        columns = [
+            column for column in df.columns
+            if column.startswith("質問") and any(token in column for token in tokens)
+        ]
+        if columns:
+            values = df[columns].apply(pd.to_numeric, errors="coerce")
+            scale_max = 7 if values.max().max() > 5 else 5
+            scores[target] = ((values.mean(axis=1) - 1) / (scale_max - 1) * 6).clip(0, 6)
+    return scores
+
+
+def current_pentagon_types(scores: pd.DataFrame) -> pd.Series:
+    labels = {
+        "Q1_自己実現派": "自己実現派",
+        "Q2_自己成長派": "自己成長派",
+        "Q3_社会交流派": "社会交流派",
+        "Q4_生活充実派": "生活充実派",
+        "Q5_自然体派": "自然体派",
+    }
+    if scores.empty:
+        return pd.Series(pd.NA, index=scores.index, dtype="string")
+    maximum = scores.max(axis=1)
+    unique = scores.eq(maximum, axis=0).sum(axis=1).eq(1)
+    types = scores.fillna(float("-inf")).idxmax(axis=1).map(labels)
+    return types.where(unique).astype("string")
+
+
 def _current_columns(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     counters = {category: 0 for category in PENTAGON_ORDER}
     columns = []

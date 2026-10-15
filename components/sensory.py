@@ -93,6 +93,10 @@ def _values(df: pd.DataFrame, column: str, limit: int | None = None) -> pd.DataF
         series = series[series != ""]
         choices = DEFAULTS.get(column)
         if choices:
+            available_choices = df.attrs.get("available_choices", {}).get(column)
+            if available_choices:
+                choices = [choice for choice in choices if choice in available_choices]
+
             def canonicalize(value: str) -> str:
                 number = re.match(r"^(\d+)[.．]?\s*", value)
                 if number and 1 <= int(number.group(1)) <= len(choices):

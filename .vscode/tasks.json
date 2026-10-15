@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run U.Ge Dashboard in Browser",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\streamlit.exe",
+      "args": [
+        "run",
+        "${workspaceFolder}\\U.Ge Dashboard.py",
+        "--server.headless=false"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local URL: http://localhost:8501"
+        }
+      }
+    },
+    {
+      "label": "Run IoT Dashboard in Browser",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\streamlit.exe",
+      "args": [
+        "run",
+        "${workspaceFolder}\\IoT.py",
+        "--server.port=8502",
+        "--server.headless=false"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local URL: http://localhost:8502"
+        }
+      }
+    }
+  ]
+}

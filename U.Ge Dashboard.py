@@ -154,17 +154,72 @@ def normalize_columns(df):
         if income_column:
             df["世帯年収"] = df[income_column]
 
+    available_choices = dict(df.attrs.get("available_choices", {}))
+    future_aliases = {
+        "創作（文筆・絵画などアナログな創作活動）": "創作",
+        "投資・資産形成（NISA等）": "投資",
+        "パソコン・インターネット閲覧": "パソコン・インターネット・SNS",
+    }
     for prefix, target in (("奮発して良かったジャンル｜", "Up-Gradeジャンル"), ("将来｜", "今後やりたいこと")):
-        source_columns = [column for column in df.columns if column.startswith(prefix)]
+        if target == "今後やりたいこと":
+            source_columns = [
+                column for column in df.columns
+                if column.startswith("将来｜") or column.startswith("【趣味】")
+            ]
+        else:
+            source_columns = [
+                column for column in df.columns if column.startswith(prefix)
+            ]
         choices = DEFAULTS.get(target, [])
         if source_columns and target not in df.columns:
             selected = pd.DataFrame(index=df.index)
             for choice in choices:
-                source = next((column for column in source_columns if column.removeprefix(prefix).replace(" ", "").startswith(choice.replace(" ", ""))), None)
+                source = next(
+                    (
+                        column for column in source_columns
+                        if (
+                            (
+                                column.removeprefix("将来｜").removeprefix("【趣味】")
+                                if target == "今後やりたいこと"
+                                else column.removeprefix(prefix)
+                            ).replace(" ", "").startswith(
+                                choice.replace(" ", "")
+                            )
+                            or (
+                                future_aliases.get(choice)
+                                and (
+                                    column.removeprefix("将来｜").removeprefix("【趣味】")
+                                    if target == "今後やりたいこと"
+                                    else column.removeprefix(prefix)
+                                ).replace(" ", "").startswith(
+                                    future_aliases[choice].replace(" ", "")
+                                )
+                            )
+                        )
+                    ),
+                    None,
+                )
                 if source:
-                    selected[choice] = pd.to_numeric(df[source], errors="coerce").fillna(0).gt(0)
+                    raw_values = df[source]
+                    numeric_values = pd.to_numeric(raw_values, errors="coerce")
+                    text_values = raw_values.astype("string").str.strip()
+                    selected[choice] = numeric_values.gt(0) | (
+                        numeric_values.isna()
+                        & raw_values.notna()
+                        & text_values.ne("")
+                        & ~text_values.isin(["0", "0.0", "-", "ー", "―"])
+                    )
             if not selected.empty:
+                if (
+                    target == "今後やりたいこと"
+                    and "今後やりたいことはない" in choices
+                    and "今後やりたいことはない" not in selected
+                ):
+                    selected["今後やりたいことはない"] = ~selected.any(axis=1)
                 df[target] = selected.apply(lambda row: ", ".join(row.index[row]), axis=1).replace("", pd.NA)
+                if target == "今後やりたいこと":
+                    available_choices[target] = list(selected.columns)
+    df.attrs["available_choices"] = available_choices
 
     if "年度" not in df.columns and "タイムスタンプ" in df.columns:
         timestamps = pd.to_datetime(df["タイムスタンプ"], errors="coerce")

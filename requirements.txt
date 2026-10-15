@@ -2,3 +2,5 @@ pandas
 plotly
 streamlit
 openpyxl
+kaleido
+matplotlib
